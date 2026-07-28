@@ -1,0 +1,176 @@
+from __future__ import annotations
+
+import argparse
+import csv
+import hashlib
+import logging
+import re
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List
+
+from etl_common import __version__, cargar_config, leer_csv, setup_logging, split_rut, validar_columnas
+from etl_layout import construir_args3, construir_payload
+from etl_ws import construir_soap, emitir_ws, motor_section, normalizar_respuesta_acepta
+
+def escribir_csv(path: Path, rows: List[Dict[str, Any]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not rows:
+        path.write_text("", encoding="utf-8")
+        return
+    campos: List[str] = []
+    for r in rows:
+        for k in r.keys():
+            if k not in campos:
+                campos.append(k)
+    with path.open("w", newline="", encoding="utf-8-sig") as f:
+        w = csv.DictWriter(f, fieldnames=campos, delimiter=";")
+        w.writeheader()
+        w.writerows(rows)
+
+def procesar(args: argparse.Namespace) -> Dict[str, Path]:
+    out_dir = Path(args.out)
+    log_path = setup_logging(out_dir)
+    cfg = cargar_config(Path(args.config))
+    input_path = Path(args.input)
+    rows = leer_csv(input_path)
+    validar_columnas(rows, args.tipo_doc_default)
+
+    if args.max_docs <= 0:
+        raise SystemExit("--max-docs debe ser mayor que cero")
+
+    total_entrada = len(rows)
+    if args.procesar_todos:
+        limite = total_entrada
+    else:
+        if total_entrada > args.max_docs and not args.permitir_mas_de_max:
+            raise SystemExit(
+                f"Seguridad: el archivo trae {total_entrada} filas y --max-docs={args.max_docs}. "
+                "Recorta la entrada, usa --permitir-mas-de-max para procesar sólo las primeras N, "
+                "o usa --procesar-todos de forma explícita."
+            )
+        limite = min(total_entrada, args.max_docs)
+
+    rows = rows[:limite]
+    input_sha256 = hashlib.sha256(input_path.read_bytes()).hexdigest()
+    logging.info(
+        "ETL versión=%s | archivo=%s | filas_entrada=%s | filas_a_procesar=%s | emitir_real=%s",
+        __version__, input_path, total_entrada, len(rows), args.emitir_real,
+    )
+
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    control: List[Dict[str, Any]] = []
+    tipo_foliacion_e72 = cfg.get("GENERAL", "tipo_foliacion_e72", fallback="2")
+
+    for idx, row in enumerate(rows, start=2):
+        payload, errs = construir_payload(row, args.tipo_doc_default)
+        folio_interno = args.folio_interno_inicial + len(control)
+        base = {
+            "VERSION_ETL": __version__,
+            "ARCHIVO_ENTRADA": input_path.name,
+            "SHA256_ENTRADA": input_sha256,
+            "NRO_LINEA": idx,
+            "BILL_NO": payload.get("BILL_NO", ""),
+            "MOTOR": payload.get("MOTOR", ""),
+            "RUT_EMISOR": payload.get("RUT_EMISOR", ""),
+            "TIPO_DTE": 61,
+            "FOLIO_INTERNO": folio_interno,
+            "FOLIO_NC": "",
+            "URL_PDF": "",
+            "TIPO_DOC_REF": payload.get("TIPO_DOC_REF", ""),
+            "FOLIO_REF": payload.get("FOLIO_REF", ""),
+            "FECHA_NC_YYYYMMDD": payload.get("FECHA_NC", ""),
+            "FECHA_ORIGEN_CSV_YYYYMMDD": payload.get("FECHA_ORIGEN_CSV", ""),
+            "FECHA_DOC_REF_YYYYMMDD": payload.get("FECHA_DOC_REF", ""),
+            "MONTO_NC": payload.get("MONTO_NC", ""),
+            "MONTO_NETO": payload.get("MONTO_NETO", ""),
+            "MONTO_IVA": payload.get("MONTO_IVA", ""),
+            "COD_REF": payload.get("COD_REF", ""),
+            "ESTADO_EMISION": "",
+            "DESCRIPCION_FALLA": "",
+            "CODIGO_RESPUESTA": "",
+            "MENSAJE_RESPUESTA": "",
+            "FECHA_HORA": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        }
+
+        if errs:
+            base["ESTADO_EMISION"] = "NOK"
+            base["DESCRIPCION_FALLA"] = " | ".join(errs)
+            base["MENSAJE_RESPUESTA"] = base["DESCRIPCION_FALLA"]
+            control.append(base)
+            continue
+
+        args3 = construir_args3(payload, folio_interno, tipo_foliacion_e72=tipo_foliacion_e72)
+        safe_bill = re.sub(r"[^A-Za-z0-9_-]+", "_", payload["BILL_NO"])
+        stem = f"{payload['MOTOR']}_{safe_bill}_{folio_interno}"
+        args3_path = out_dir / f"{stem}_args3.txt"
+        soap_path = out_dir / f"{stem}_request.xml"
+        args3_path.write_text(args3, encoding="latin-1", errors="ignore")
+
+        sec = motor_section(payload["MOTOR"])
+        soap_preview = construir_soap(
+            cfg.get(sec, "args0", fallback=split_rut(payload["RUT_EMISOR"])[0]),
+            "***OCULTO***" if cfg.get(sec, "args1", fallback="") and not cfg.get(sec, "args1").upper().startswith("COMPLETAR") else "COMPLETAR_LOGIN",
+            "***OCULTO***" if cfg.get(sec, "args2", fallback="") and not cfg.get(sec, "args2").upper().startswith("COMPLETAR") else "COMPLETAR_PASSWORD_O_HASH",
+            args3,
+            cfg.get("GENERAL", "args4", fallback="1"),
+            cfg.get("GENERAL", "args5", fallback="2"),
+        )
+        soap_path.write_text(soap_preview, encoding="utf-8")
+
+        if not args.emitir_real:
+            base["ESTADO_EMISION"] = "OK"
+            base["MENSAJE_RESPUESTA"] = f"DRY_RUN_OK. No emitido. TXT={args3_path.name}; SOAP={soap_path.name}"
+            control.append(base)
+            continue
+
+        try:
+            resp = emitir_ws(payload, args3, cfg)
+            if payload.get("MOTOR") == "ACEPTA":
+                resp = normalizar_respuesta_acepta(resp)
+            raw_path = out_dir / f"{stem}_response.xml"
+            raw_path.write_text(resp.raw_response, encoding="utf-8", errors="ignore")
+            base["FOLIO_NC"] = resp.folio_nc
+            base["URL_PDF"] = resp.url_pdf
+            base["CODIGO_RESPUESTA"] = resp.codigo
+            base["MENSAJE_RESPUESTA"] = resp.mensaje
+
+            if resp.estado == "EMITIDO_OK":
+                base["ESTADO_EMISION"] = "OK"
+                base["DESCRIPCION_FALLA"] = ""
+            else:
+                base["ESTADO_EMISION"] = "NOK"
+                base["DESCRIPCION_FALLA"] = resp.mensaje or f"Respuesta no OK del facturador. Codigo={resp.codigo}"
+            control.append(base)
+        except Exception as exc:
+            base["ESTADO_EMISION"] = "NOK"
+            base["DESCRIPCION_FALLA"] = str(exc)
+            base["MENSAJE_RESPUESTA"] = str(exc)
+            control.append(base)
+
+    control_path = out_dir / f"nc_control_emision_{ts}.csv"
+    escribir_csv(control_path, control)
+    ok = sum(1 for r in control if r.get("ESTADO_EMISION") == "OK")
+    nok = len(control) - ok
+    logging.info("Resumen: procesados=%s | OK=%s | NOK=%s", len(control), ok, nok)
+    logging.info("Control único: %s", control_path)
+    logging.info("Log: %s", log_path)
+    return {"control": control_path, "log": log_path, "config": Path(args.config)}
+
+def build_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(description="ETL emisión NC 61 OnlineGenerationDte Acepta/Cóndor")
+    p.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
+    p.add_argument("--input", required=True, help="CSV de entrada")
+    p.add_argument("--out", default="salida_nc_onlinegeneration", help="Carpeta de salida")
+    p.add_argument("--config", default="config_nc_onlinegeneration.ini", help="INI endpoint/credenciales")
+    p.add_argument("--max-docs", type=int, default=2, help="Máximo de documentos a procesar (por defecto: 2)")
+    p.add_argument("--permitir-mas-de-max", action="store_true", help="Acepta un archivo mayor, pero procesa sólo los primeros --max-docs")
+    p.add_argument("--procesar-todos", action="store_true", help="Procesa explícitamente todas las filas del archivo; usar con precaución")
+    p.add_argument("--folio-interno-inicial", type=int, default=1, help="Folio interno enviado en E3")
+    p.add_argument("--emitir-real", action="store_true", help="ENVÍA al WS. Sin esto sólo genera args3/SOAP")
+    p.add_argument("--tipo-doc-default", type=int, default=None, help="Sólo contingencia: usa este TIPO_DOC_REF si el CSV no trae TIPO_DOC")
+    return p
+
+def main() -> None:
+    args = build_parser().parse_args()
+    procesar(args)

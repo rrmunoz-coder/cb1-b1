@@ -2,7 +2,7 @@
 
 Este repositorio es público. Nunca se deben subir:
 
-- `config_nc_onlinegeneration.ini` con endpoint, login o hash.
+- `config_dte_onlinegeneration.ini` con endpoint, login o hash.
 - CSV reales con RUT, nombre, dirección, correo, folio o monto.
 - XML de solicitud/respuesta, TXT `args3`, logs o archivos de control.
 

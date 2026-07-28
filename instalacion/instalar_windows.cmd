@@ -17,9 +17,9 @@ call ".venv\Scripts\activate.bat"
 python -m pip install --upgrade pip
 python -m pip install -r "instalacion\requirements.txt"
 
-if not exist "config_nc_onlinegeneration.ini" (
-  copy /Y "config\config_nc_onlinegeneration.example.ini" "config_nc_onlinegeneration.ini" >nul
-  echo Se creo config_nc_onlinegeneration.ini. Completa endpoint y credenciales antes de emitir.
+if not exist "config_dte_onlinegeneration.ini" (
+  copy /Y "config\config_dte_onlinegeneration.example.ini" "config_dte_onlinegeneration.ini" >nul
+  echo Se creo config_dte_onlinegeneration.ini. Completa endpoint y credenciales antes de emitir.
 )
 
 python "src\etl_emision_dte_onlinegeneration_real.py" --version

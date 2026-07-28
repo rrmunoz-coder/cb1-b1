@@ -13,8 +13,8 @@ if not exist "%INPUT%" (
   echo ERROR: No existe el archivo de entrada: %INPUT%
   exit /b 1
 )
-if not exist "config_nc_onlinegeneration.ini" (
-  echo ERROR: Falta config_nc_onlinegeneration.ini
+if not exist "config_dte_onlinegeneration.ini" (
+  echo ERROR: Falta config_dte_onlinegeneration.ini
   exit /b 1
 )
 
@@ -30,7 +30,7 @@ if /I not "%CONFIRMACION%"=="EMITIR" (
 "%PY%" "src\etl_emision_dte_onlinegeneration_real.py" ^
   --input "%INPUT%" ^
   --out "salida_dte" ^
-  --config "config_nc_onlinegeneration.ini" ^
+  --config "config_dte_onlinegeneration.ini" ^
   --emitir-real ^
   --max-docs 2 ^
   --permitir-mas-de-max

@@ -19,9 +19,11 @@ python -m pip install -r "instalacion\requirements.txt"
 
 if not exist "config_dte_onlinegeneration.ini" (
   copy /Y "config\config_dte_onlinegeneration.example.ini" "config_dte_onlinegeneration.ini" >nul
-  echo Se creo config_dte_onlinegeneration.ini. Completa endpoint y credenciales antes de emitir.
+  echo Se creo config_dte_onlinegeneration.ini.
+  echo Completa Oracle, endpoint y credenciales antes de usar el flujo.
 )
 
 python "src\etl_emision_dte_onlinegeneration_real.py" --version
+python "src\extraer_candidatos_oracle.py" --version
 echo Instalacion terminada.
 endlocal

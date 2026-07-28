@@ -1,63 +1,48 @@
 # Prompt maestro para regenerar o evolucionar el ETL
 
-Usa el siguiente prompt junto con la última versión del código, el `CHANGELOG.md`, el manual y ejemplos **sin datos reales**:
+Usa este prompt junto con la última versión del código, el changelog, el manual y ejemplos sin datos reales.
 
 ---
 
-Actúa como desarrollador senior Python especializado en ETL financiero, facturación electrónica chilena, SOAP y controles auditables. Regenera o mejora el proyecto **ETL CB1/B1 — emisión de Notas de Crédito DTE 61 por OnlineGenerationDte**, manteniendo compatibilidad funcional y control de versiones.
+Actúa como desarrollador senior Python especializado en ETL financiero, DTE chilenos, SOAP y controles auditables. Regenera o mejora el proyecto **ETL CB1/B1 — emisión DTE 33, 39 y 61 por OnlineGenerationDte**.
 
-## Objetivo funcional
+## Contrato funcional obligatorio
 
-Procesar un CSV y construir una NC DTE 61. Enrutar por `RUT_EMISOR`:
+1. `TIPO_DOC` representa siempre el DTE a emitir: `33`, `39` o `61`.
+2. No implementar compatibilidad con esquemas antiguos ni usar `TIPO_DOC_TRIB`.
+3. Para B1 `33/39`, `MONTO_DOC` es el total emitido.
+4. Para factura `33`, exigir `GIRO` del receptor.
+5. Para NC `61`, exigir `TIPO_DOC_REF`, `FOLIO_REBAJADO`, `EMISION_BOLETA` y `MONTO_NCRD`.
+6. Para NC, `MONTO_DOC` es el total original y `MONTO_NCRD` el total emitido.
+7. `COD_REF=1` si ambos montos son iguales; de lo contrario `COD_REF=3`.
+8. Rechazar `MONTO_NCRD > MONTO_DOC`.
+9. Validar la fecha referenciada por mes calendario con `[REGLAS] meses_documento_referencia_nc`.
+10. Con valor `1`, aceptar sólo el mes de ejecución y el mes anterior; rechazar meses futuros.
+11. Enrutar `94675000-K` a ACEPTA y `76114143-0` a Cóndor/Paperless.
 
-- `94675000-K` → motor `ACEPTA`.
-- `76114143-0` → motor `CONDOR`/Paperless.
+## Layouts
 
-Aplicar estas reglas:
+- DTE 33/39: E/D/G/T con largos 1405/2075/123/70.
+- DTE 61: E/D/F/G/T con largos 1405/2075/185/123/70.
+- En F conservar `FchRef` 35–42 y `CodRef` 43.
+- Mantener el tratamiento especial ACEPTA para el tipo de referencia cuando corresponda.
 
-1. `TIPO_DOC_TRIB=61`.
-2. `TIPO_DOC` es el documento referenciado y admite 33, 39 o 61.
-3. `COD_REF=1` cuando `MONTO_NCRD == MONTO_DOC`; en otro caso `COD_REF=3`.
-4. Rechazar `MONTO_NCRD > MONTO_DOC` y montos no positivos.
-5. Glosa fija: `Ajuste de Cargo Emitido`.
-6. Documento afecto: `neto=round(total/1.19)` e `IVA=total-neto`.
-7. `FECHA_NC` corresponde al día de ejecución; `EMISION_BOLETA` es la fecha del documento referenciado.
-8. El folio real lo asigna el facturador y se obtiene desde `Mensaje` con formato `folio|url`.
+## Seguridad
 
-## Restricciones técnicas críticas
+- Dry-run por defecto; emitir sólo con `--emitir-real`.
+- Máximo dos documentos por defecto y `--procesar-todos` explícito.
+- No guardar credenciales, endpoint real, datos personales ni respuestas productivas.
+- Ocultar login y hash en el SOAP de previsualización.
+- No realizar llamadas reales durante pruebas.
 
-- Conservar exactamente los layouts posicionales E, D, F, G y T y sus largos: 1405, 2075, 185, 123 y 70.
-- En la referencia F, mantener `FchRef` en posiciones 35–42 y `CodRef` en 43.
-- Para ACEPTA, conservar el tratamiento especial del tipo referenciado sin cero izquierdo cuando corresponda.
-- Soportar CSV UTF-8, UTF-8-SIG, Latin-1 y CP1252; detectar delimitador `; , | tab`.
-- Soportar fechas ISO, DD/MM/YYYY, YYYYMMDD, DDMMYYYY y serial Excel.
-- Soportar enteros Excel como `39.0` y montos chilenos como `23.000` sin alterar su valor.
-- Mantener dry-run por defecto. Sólo emitir con `--emitir-real`.
-- Mantener límite seguro de dos documentos y un parámetro explícito `--procesar-todos`.
-- Nunca guardar credenciales reales en código, pruebas, logs, XML de previsualización ni repositorio.
-- Ocultar tanto login como password/hash en el SOAP de previsualización.
-- No incluir CSV reales, RUT de clientes, nombres, direcciones, correos ni respuestas operacionales.
-- Conservar salida de control con estado OK/NOK, folio, URL, código, mensaje, versión del ETL y SHA-256 del archivo de entrada.
-- No realizar llamadas reales al web service durante pruebas automáticas.
+## Calidad y entregables
 
-## Entregables
+- Python 3.10–3.13.
+- Pruebas para DTE 33, 39, 61, regla mensual, fechas futuras, montos, SOAP y largos.
+- README, manual, INI de ejemplo, scripts Windows, VERSION y CHANGELOG.
+- Versionado semántico; cualquier cambio al contrato de entrada debe incrementar versión mayor.
+- Antes de producción, advertir que DTE 33/39 requiere homologación controlada con ambos facturadores.
 
-1. Código Python compatible con Python 3.10–3.13.
-2. `requirements.txt` mínimo y con versiones acotadas.
-3. Configuración `.ini.example` sin secretos ni endpoint interno real.
-4. Scripts Windows para instalar, probar, hacer dry-run y emitir un máximo de dos documentos con confirmación.
-5. Pruebas unitarias para números, fechas, respuesta SOAP, validaciones y largos E/D/F/G/T.
-6. README, manual de instalación/uso, `.gitignore`, `SECURITY.md`, `VERSION` y `CHANGELOG.md`.
-7. Indicar claramente la nueva versión semántica y justificar cada cambio.
-
-## Criterios de aceptación
-
-- `python -m py_compile` termina sin errores.
-- `python -m unittest discover -s tests -v` pasa completamente.
-- Un dry-run con datos ficticios genera control OK y no llama al endpoint.
-- Ningún archivo entregado contiene secretos, endpoint interno real o datos personales.
-- Toda modificación que afecte layouts, reglas tributarias o emisión real debe quedar destacada como cambio de alto riesgo.
-
-Antes de devolver el resultado, compara la nueva versión con la anterior, enumera riesgos residuales y actualiza el historial de cambios.
+Criterios de aceptación: compila, todas las pruebas pasan, el dry-run ficticio genera sólo OK y ningún archivo contiene secretos.
 
 ---

@@ -1,96 +1,100 @@
-# Instalación y uso
+# Instalación y uso — ETL CB1/B1 v2.0.0
 
 ## 1. Requisitos
 
-- Windows 10/11 o Windows Server con acceso autorizado a la red corporativa.
-- Python 3.10 a 3.13, idealmente 64 bits.
-- Acceso al endpoint OnlineGenerationDte.
-- Login y password/hash para ACEPTA y Cóndor/Paperless.
-- CSV con las columnas requeridas.
+- Windows 10/11 o Windows Server.
+- Python 3.10 a 3.13 de 64 bits.
+- Acceso autorizado al endpoint OnlineGenerationDte.
+- Credenciales para ACEPTA y Cóndor/Paperless.
+- Biblioteca Python `requests`.
 
-La única librería externa necesaria es `requests`; las demás usadas por el ETL pertenecen a la biblioteca estándar de Python.
+## 2. Instalación
 
-## 2. Instalación automática
-
-Desde la raíz del proyecto:
+Desde la raíz:
 
 ```bat
 instalacion\instalar_windows.cmd
 ```
 
-El script crea `.venv`, actualiza `pip`, instala `requests` y genera `config_nc_onlinegeneration.ini` desde la plantilla cuando no existe.
+El instalador crea `.venv`, instala dependencias y copia la plantilla como `config_nc_onlinegeneration.ini` cuando el archivo no existe.
 
-Equivalente manual:
+Instalación manual:
 
 ```bat
 py -3 -m venv .venv
 .venv\Scripts\activate
-python -m pip install --upgrade pip
 python -m pip install -r instalacion\requirements.txt
 ```
 
 ## 3. Configuración
 
-Edita `config_nc_onlinegeneration.ini` en la raíz y completa:
+Completa localmente:
 
-- `[GENERAL] endpoint`
-- `[ACEPTA] args1` y `args2`
-- `[CONDOR] args1` y `args2`
+```ini
+[GENERAL]
+endpoint = COMPLETAR_ENDPOINT_INTERNO
 
-No subas este archivo a GitHub. La `.gitignore` lo excluye.
+[REGLAS]
+meses_documento_referencia_nc = 1
 
-## 4. Columnas del CSV
-
-```text
-MARCA,RUT_EMISOR,TIPO_DOC_TRIB,TIPO_SUSCRIPTOR,RUT_CLIENTE,NOMBRE,
-DIRECCION,COMUNA,CIUDAD,BILL_NO,EMISION,FOLIO_REBAJADO,TIPO_DOC,
-EMISION_BOLETA,MONTO_NCRD,MONTO_DOC,EMAIL
+[DOCUMENTOS]
+glosa_b1 = Servicios de Telecomunicaciones
+glosa_nc = Ajuste de Cargo Emitido
 ```
 
-Reglas principales:
+Interpretación de `meses_documento_referencia_nc`:
 
-- `TIPO_DOC_TRIB` debe ser `61`.
-- `TIPO_DOC` es el documento referenciado: `33`, `39` o `61`.
-- `94675000-K` se enruta a ACEPTA.
-- `76114143-0` se enruta a Cóndor/Paperless.
-- `MONTO_NCRD` debe ser positivo y no superar `MONTO_DOC`.
-- `COD_REF=1` cuando ambos montos son iguales; de lo contrario `COD_REF=3`.
-- La fecha de la NC es el día de ejecución.
+- `0`: sólo documentos del mes de ejecución.
+- `1`: mes de ejecución o mes anterior.
+- `2`: mes de ejecución o hasta dos meses anteriores.
 
-## 5. Pruebas automáticas
+La regla usa meses calendario. Una NC ejecutada el 28 de julio con valor `1` acepta cualquier fecha de junio o julio, pero rechaza mayo y agosto.
+
+## 4. Contrato del CSV v2
+
+Cabecera recomendada:
+
+```text
+MARCA,RUT_EMISOR,TIPO_DOC,TIPO_SUSCRIPTOR,RUT_CLIENTE,NOMBRE,GIRO,
+DIRECCION,COMUNA,CIUDAD,BILL_NO,EMISION,MONTO_DOC,EMAIL,
+TIPO_DOC_REF,FOLIO_REBAJADO,EMISION_BOLETA,MONTO_NCRD
+```
+
+### Campos comunes
+
+- `TIPO_DOC`: DTE que se emitirá: `33`, `39` o `61`.
+- `EMISION`: fecha del B1. Para NC queda informativa porque la fecha de la NC es la fecha de ejecución.
+- `MONTO_DOC`: total del B1 o total del documento original cuando se emite una NC.
+- `GIRO`: obligatorio para factura `33`; opcional para `39` y `61`.
+
+### Campos exclusivos para NC 61
+
+- `TIPO_DOC_REF`: tipo del documento referenciado: `33`, `39` o `61`.
+- `FOLIO_REBAJADO`: folio referenciado.
+- `EMISION_BOLETA`: fecha de emisión del documento referenciado.
+- `MONTO_NCRD`: monto total de la NC.
+
+Reglas NC:
+
+- `MONTO_NCRD` debe ser positivo.
+- `MONTO_NCRD` no puede superar `MONTO_DOC`.
+- `COD_REF=1` cuando ambos montos son iguales; en otro caso `COD_REF=3`.
+- La fecha referenciada debe cumplir el rango mensual del INI.
+
+## 5. Layout generado
+
+- B1 `33/39`: `E`, `D`, `G`, `T` con largos `1405`, `2075`, `123`, `70`.
+- NC `61`: `E`, `D`, `F`, `G`, `T` con largos `1405`, `2075`, `185`, `123`, `70`.
+- En NC, `FchRef` permanece en posiciones 35–42 y `CodRef` en 43.
+
+## 6. Pruebas
 
 ```bat
 scripts\probar_codigo.cmd
-```
-
-Valida parseo de números/fechas, respuesta SOAP y largo de registros E/D/F/G/T.
-
-## 6. Dry-run: no emite
-
-Con datos ficticios:
-
-```bat
 scripts\ejecutar_prueba.cmd
 ```
 
-Con un archivo específico:
-
-```bat
-scripts\ejecutar_prueba.cmd C:\ruta\reporte_diario.csv
-```
-
-También puede ejecutarse directamente:
-
-```bat
-.venv\Scripts\python.exe src\etl_emision_nc_onlinegeneration_real.py ^
-  --input reporte_diario.csv ^
-  --out salida_nc_prueba ^
-  --config config_nc_onlinegeneration.ini ^
-  --max-docs 2 ^
-  --permitir-mas-de-max
-```
-
-Sin `--emitir-real`, sólo genera TXT `args3`, SOAP ocultando credenciales, log y CSV de control.
+El segundo comando procesa el CSV ficticio completo en dry-run. No llama al endpoint.
 
 ## 7. Emisión real limitada
 
@@ -98,51 +102,35 @@ Sin `--emitir-real`, sólo genera TXT `args3`, SOAP ocultando credenciales, log 
 scripts\ejecutar_real.cmd reporte_diario.csv
 ```
 
-El script exige escribir `EMITIR` y procesa como máximo dos documentos.
+Exige escribir `EMITIR` y procesa máximo dos documentos.
 
-## 8. Emisión real de todo el archivo
+## 8. Emisión real completa
 
-Primero ejecuta dry-run y revisa el CSV de control. Luego, sólo cuando corresponda:
+Después de revisar el dry-run:
 
 ```bat
-.venv\Scripts\python.exe src\etl_emision_nc_onlinegeneration_real.py ^
+.venv\Scripts\python.exe src\etl_emision_dte_onlinegeneration_real.py ^
   --input reporte_diario.csv ^
-  --out salida_nc ^
+  --out salida_dte ^
   --config config_nc_onlinegeneration.ini ^
   --emitir-real ^
   --procesar-todos
 ```
 
-`--procesar-todos` es explícito para evitar que un archivo grande sea emitido accidentalmente. El parámetro heredado `--permitir-mas-de-max` **no procesa todo**: sólo permite que el archivo sea mayor y toma las primeras `--max-docs` filas.
+## 9. Salidas
 
-## 9. Archivos de salida
+- `*_args3.txt`: layout posicional.
+- `*_request.xml`: SOAP de previsualización sin credenciales visibles.
+- `*_response.xml`: respuesta real del facturador.
+- `dte_control_emision_*.csv`: control OK/NOK, tipo DTE, folio, montos y regla NC.
+- `etl_dte_*.log`: bitácora.
 
-- `*_args3.txt`: layout posicional enviado en `args3`.
-- `*_request.xml`: previsualización SOAP con login y hash ocultos.
-- `*_response.xml`: respuesta completa cuando existe emisión real.
-- `nc_control_emision_*.csv`: resultado homologado OK/NOK, folio, URL, mensaje, versión y SHA-256 de entrada.
-- `etl_nc_*.log`: bitácora de ejecución.
-
-## 10. Versiones
-
-La versión está en `VERSION`, `__version__` y `CHANGELOG.md`. Para una nueva versión:
-
-1. Crear una rama, por ejemplo `version/1.2.0`.
-2. Modificar código y pruebas.
-3. Ejecutar `scripts\probar_codigo.cmd` y un dry-run.
-4. Actualizar `VERSION`, `__version__` y `CHANGELOG.md`.
-5. Integrar mediante pull request o commit controlado.
-
-## 11. Qué cargar en Python
-
-El entorno requiere:
+## 10. Dependencia Python
 
 ```text
 requests>=2.31.0,<3.0.0
 ```
 
-Instalación directa:
+## 11. Homologación necesaria
 
-```bat
-python -m pip install "requests>=2.31.0,<3.0.0"
-```
+Antes de emitir B1 en volumen, ejecutar casos controlados de DTE 33 y 39 en ambos motores y validar PDF, folio, montos, giro receptor, fecha y contabilización. Las NC mantienen la estructura de referencia ya utilizada, agregando únicamente la restricción mensual configurable.

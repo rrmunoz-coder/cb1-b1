@@ -1,20 +1,34 @@
 # Historial de versiones
 
+## 2.0.0 — 2026-07-28
+
+Cambio mayor y no retrocompatible.
+
+- Se habilita emisión mixta B1/CB1: DTE `33`, `39` y `61`.
+- `TIPO_DOC` pasa a representar exclusivamente el DTE que se emitirá.
+- Para NC se incorpora `TIPO_DOC_REF` como campo independiente.
+- Se elimina `TIPO_DOC_TRIB` y toda lógica de compatibilidad con el contrato anterior.
+- Para B1, `MONTO_DOC` es el total emitido.
+- Para NC, `MONTO_NCRD` es el total emitido y `MONTO_DOC` corresponde al documento original.
+- Las facturas DTE 33 exigen `GIRO` del receptor.
+- Se agrega `[REGLAS] meses_documento_referencia_nc` al INI.
+- Con valor `1`, la NC sólo acepta documentos del mes de ejecución o del mes anterior.
+- Se rechazan referencias de meses futuros o con antigüedad superior al parámetro.
+- B1 genera registros `E/D/G/T`; NC genera `E/D/F/G/T`.
+- Se generalizan salida y nombres internos: `FOLIO_DTE`, `FECHA_DTE`, `MONTO_TOTAL_DTE`.
+- Nuevo ejecutable: `src/etl_emision_dte_onlinegeneration_real.py`.
+- Se agregan nueve pruebas automáticas para B1, NC, regla mensual, layouts, números y SOAP.
+
+### Riesgo residual
+
+El layout B1 33/39 se construyó sobre la plantilla posicional disponible y requiere homologación controlada con ACEPTA y Cóndor/Paperless antes de una corrida productiva masiva.
+
 ## 1.1.0 — 2026-07-28
 
-- Revisión técnica y empaquetado inicial en GitHub.
-- Corrección de `parse_int`: valores Excel como `39.0` ya no se transforman erróneamente en `390`.
-- Corrección de `parse_monto`: montos chilenos como `23.000` se interpretan como `23000`.
-- Nuevo parámetro explícito `--procesar-todos`; se conserva `--permitir-mas-de-max` por compatibilidad.
-- Se ocultan login y hash en el SOAP de previsualización.
-- Se agrega versión, nombre y SHA-256 del archivo de entrada al CSV de control.
-- Se agrega resumen OK/NOK al log.
-- Se elimina el endpoint interno predeterminado del código público; debe configurarse en el INI local.
-- Se incorporan pruebas automáticas, scripts Windows, documentación y plantilla de configuración.
+- Revisión técnica y empaquetado inicial.
+- Corrección de enteros Excel y montos chilenos.
+- Seguridad de dry-run, SHA-256 de entrada, pruebas y documentación.
 
 ## 1.0.0 — versión recibida
 
 - Emisión NC DTE 61 por OnlineGenerationDte.
-- Ruteo ACEPTA / Cóndor-Paperless según RUT emisor.
-- Construcción posicional E/D/F/G/T.
-- Modo seguro dry-run y salida única de control.

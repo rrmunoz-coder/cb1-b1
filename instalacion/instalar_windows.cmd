@@ -22,6 +22,6 @@ if not exist "config_nc_onlinegeneration.ini" (
   echo Se creo config_nc_onlinegeneration.ini. Completa endpoint y credenciales antes de emitir.
 )
 
-python "src\etl_emision_nc_onlinegeneration_real.py" --version
+python "src\etl_emision_dte_onlinegeneration_real.py" --version
 echo Instalacion terminada.
 endlocal

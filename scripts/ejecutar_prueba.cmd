@@ -14,11 +14,10 @@ if not exist "config_nc_onlinegeneration.ini" (
   exit /b 1
 )
 
-"%PY%" "src\etl_emision_nc_onlinegeneration_real.py" ^
+"%PY%" "src\etl_emision_dte_onlinegeneration_real.py" ^
   --input "%INPUT%" ^
-  --out "salida_nc_prueba" ^
+  --out "salida_dte_prueba" ^
   --config "config_nc_onlinegeneration.ini" ^
-  --max-docs 2 ^
-  --permitir-mas-de-max
+  --procesar-todos
 
 endlocal

@@ -18,7 +18,7 @@ if not exist "config_nc_onlinegeneration.ini" (
   exit /b 1
 )
 
-echo ADVERTENCIA: esta opcion emite documentos reales.
+echo ADVERTENCIA: esta opcion emite DTE 33, 39 o 61 reales.
 echo Archivo: %INPUT%
 echo Por seguridad se procesaran como maximo 2 documentos.
 set /p "CONFIRMACION=Escribe EMITIR para continuar: "
@@ -27,9 +27,9 @@ if /I not "%CONFIRMACION%"=="EMITIR" (
   exit /b 1
 )
 
-"%PY%" "src\etl_emision_nc_onlinegeneration_real.py" ^
+"%PY%" "src\etl_emision_dte_onlinegeneration_real.py" ^
   --input "%INPUT%" ^
-  --out "salida_nc" ^
+  --out "salida_dte" ^
   --config "config_nc_onlinegeneration.ini" ^
   --emitir-real ^
   --max-docs 2 ^

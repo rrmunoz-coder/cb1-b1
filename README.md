@@ -1,23 +1,31 @@
-# ETL CB1 / B1 — Emisión NC DTE 61
+# ETL CB1 / B1 — Emisión DTE 33, 39 y 61
 
-Proyecto versionado para generar y, bajo confirmación explícita, emitir Notas de Crédito DTE 61 mediante OnlineGenerationDte, con ruteo a ACEPTA o Cóndor/Paperless según el RUT emisor.
+ETL versionado para generar y, sólo con confirmación explícita, emitir documentos mediante OnlineGenerationDte:
 
-**Versión actual:** `1.1.0`
+- `33`: factura electrónica B1.
+- `39`: boleta electrónica B1.
+- `61`: nota de crédito CB1.
 
-## Seguridad primero
+El motor se selecciona por `RUT_EMISOR`: ACEPTA o Cóndor/Paperless.
 
-El repositorio es público. La configuración real, los CSV operacionales y las salidas con datos personales están excluidos mediante `.gitignore`. Sólo se incluye una configuración de ejemplo y un CSV ficticio.
+**Versión actual:** `2.0.0`
 
-## Estructura
+## Cambio principal de la versión 2
 
-- `src/`: ETL principal.
-- `config/`: plantilla INI sin credenciales.
-- `examples/`: CSV ficticio para pruebas.
-- `instalacion/`: dependencias, instalación y manual de uso.
-- `scripts/`: ejecución de prueba, emisión real limitada y pruebas automáticas.
-- `tests/`: pruebas unitarias.
-- `PROMPT_REGENERACION.md`: prompt maestro para reconstruir o evolucionar el código.
-- `CHANGELOG.md`: control de versiones y cambios.
+El contrato de entrada no es retrocompatible. `TIPO_DOC` representa siempre el DTE que se emitirá. Para una NC se deben informar además `TIPO_DOC_REF`, `FOLIO_REBAJADO`, `EMISION_BOLETA` y `MONTO_NCRD`.
+
+La antigüedad máxima del documento referenciado se configura en el INI:
+
+```ini
+[REGLAS]
+meses_documento_referencia_nc = 1
+```
+
+`1` permite el mes de ejecución y el mes inmediatamente anterior. La validación se realiza por mes calendario.
+
+## Seguridad
+
+El repositorio es público. No contiene configuración real, CSV operacionales, respuestas del facturador ni datos personales. Estos archivos están excluidos mediante `.gitignore`.
 
 ## Inicio rápido en Windows
 
@@ -27,12 +35,16 @@ scripts\probar_codigo.cmd
 scripts\ejecutar_prueba.cmd
 ```
 
-Luego completa `config_nc_onlinegeneration.ini` sólo en tu equipo. Para emisión real limitada a dos documentos:
+Luego completa `config_nc_onlinegeneration.ini` sólo en tu equipo. Para una emisión real limitada a dos documentos:
 
 ```bat
 scripts\ejecutar_real.cmd reporte_diario.csv
 ```
 
-La emisión real exige escribir `EMITIR`. Para procesar todo el archivo se debe ejecutar manualmente con `--procesar-todos`; revisa primero el manual.
+La emisión real exige escribir `EMITIR`.
 
-Consulta [`instalacion/INSTALACION_Y_USO.md`](instalacion/INSTALACION_Y_USO.md) para el detalle completo.
+## Advertencia de homologación
+
+La generación NC conserva el layout previamente validado. La generación B1 `33/39` usa registros `E/D/G/T` y debe homologarse mediante dry-run y pruebas controladas con cada facturador antes de una emisión masiva.
+
+Consulta [`instalacion/INSTALACION_Y_USO.md`](instalacion/INSTALACION_Y_USO.md) para el contrato completo del CSV y ejemplos.

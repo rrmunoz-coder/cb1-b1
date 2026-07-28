@@ -11,11 +11,14 @@ entrada*.csv
 *.xls
 
 # Salidas operacionales
+salida_dte*/
 salida_nc*/
 *_args3.txt
 *_request.xml
 *_response.xml
+dte_control_emision_*.csv
 nc_control_emision_*.csv
+etl_dte_*.log
 etl_nc_*.log
 
 # Python

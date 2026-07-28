@@ -1,4 +1,6 @@
 # Credenciales y configuración real
+config_dte_onlinegeneration.ini
+**/config_dte_onlinegeneration.ini
 config_nc_onlinegeneration.ini
 **/config_nc_onlinegeneration.ini
 *.env

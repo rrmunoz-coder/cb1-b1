@@ -19,9 +19,24 @@ Cambio mayor y no retrocompatible.
 - Nuevo ejecutable: `src/etl_emision_dte_onlinegeneration_real.py`.
 - Se agregan nueve pruebas automáticas para B1, NC, regla mensual, layouts, números y SOAP.
 
+### Extracción Oracle incorporada
+
+- Se agrega conexión directa a Oracle mediante `python-oracledb`.
+- Fuente: `SCBILL.HP_CONSOLIDADO_ANDES_VTR_B1`.
+- Se agrega `sql/candidatos_entrada_etl.sql` con filtros configurables.
+- La consulta devuelve las 18 columnas exactas del contrato CSV.
+- Se agrega cruce CB1 entre `FOLIO_REBAJADO` e `ID_DOC_PPL` para recuperar el documento original.
+- Se agregan valores descriptivos de respaldo en `[ENTRADA_DEFAULTS]`.
+- Los datos financieros o tributarios faltantes nunca se reemplazan por defaults.
+- Los candidatos incompletos se separan en `salida_extraccion/candidatos_rechazados.csv`.
+- Se agregan `scripts/extraer_oracle.cmd` y `scripts/extraer_y_probar.cmd`.
+- Se agregan siete pruebas unitarias para el extractor.
+
 ### Riesgo residual
 
-El layout B1 33/39 se construyó sobre la plantilla posicional disponible y requiere homologación controlada con ACEPTA y Cóndor/Paperless antes de una corrida productiva masiva.
+El layout B1 33/39 requiere homologación controlada con ACEPTA y Cóndor/Paperless antes de una corrida productiva masiva.
+
+El cruce `FOLIO_REBAJADO = ID_DOC_PPL` debe validarse con casos reales antes de habilitar emisión masiva de CB1.
 
 ## 1.1.0 — 2026-07-28
 

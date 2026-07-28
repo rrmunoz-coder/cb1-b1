@@ -180,7 +180,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     parser.add_argument("--input", required=True, help="CSV de entrada")
     parser.add_argument("--out", default="salida_dte_onlinegeneration", help="Carpeta de salida")
-    parser.add_argument("--config", default="config_nc_onlinegeneration.ini", help="INI endpoint, credenciales y reglas")
+    parser.add_argument("--config", default="config_dte_onlinegeneration.ini", help="INI endpoint, credenciales y reglas")
     parser.add_argument("--max-docs", type=int, default=2, help="Máximo de documentos a procesar (por defecto: 2)")
     parser.add_argument("--permitir-mas-de-max", action="store_true", help="Acepta archivo mayor, pero procesa sólo los primeros --max-docs")
     parser.add_argument("--procesar-todos", action="store_true", help="Procesa todas las filas explícitamente")

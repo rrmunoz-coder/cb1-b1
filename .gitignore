@@ -1,0 +1,33 @@
+# Credenciales y configuración real
+config_nc_onlinegeneration.ini
+**/config_nc_onlinegeneration.ini
+*.env
+.env*
+
+# Datos reales / personales
+reporte_diario.csv
+entrada*.csv
+*.xlsx
+*.xls
+
+# Salidas operacionales
+salida_nc*/
+*_args3.txt
+*_request.xml
+*_response.xml
+nc_control_emision_*.csv
+etl_nc_*.log
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+
+# Editores / SO
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

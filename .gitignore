@@ -15,6 +15,7 @@ entrada*.csv
 # Salidas operacionales
 salida_dte*/
 salida_nc*/
+salida_extraccion/
 *_args3.txt
 *_request.xml
 *_response.xml

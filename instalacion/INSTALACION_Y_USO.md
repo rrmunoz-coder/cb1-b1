@@ -16,7 +16,7 @@ Desde la raíz:
 instalacion\instalar_windows.cmd
 ```
 
-El instalador crea `.venv`, instala dependencias y copia la plantilla como `config_nc_onlinegeneration.ini` cuando el archivo no existe.
+El instalador crea `.venv`, instala dependencias y copia la plantilla como `config_dte_onlinegeneration.ini` cuando el archivo no existe.
 
 Instalación manual:
 
@@ -26,9 +26,26 @@ py -3 -m venv .venv
 python -m pip install -r instalacion\requirements.txt
 ```
 
-## 3. Configuración
+## 3. Archivos locales en la raíz
 
-Completa localmente:
+Deja ambos archivos en la raíz del proyecto:
+
+```text
+cb1-b1\
+├─ reporte_diario.csv
+├─ config_dte_onlinegeneration.ini
+├─ src\
+├─ scripts\
+├─ instalacion\
+├─ examples\
+└─ tests\
+```
+
+Ambos están excluidos de GitHub porque contienen información operacional o credenciales.
+
+## 4. Configuración
+
+Completa localmente `config_dte_onlinegeneration.ini`:
 
 ```ini
 [GENERAL]
@@ -50,7 +67,7 @@ Interpretación de `meses_documento_referencia_nc`:
 
 La regla usa meses calendario. Una NC ejecutada el 28 de julio con valor `1` acepta cualquier fecha de junio o julio, pero rechaza mayo y agosto.
 
-## 4. Contrato del CSV v2
+## 5. Contrato del CSV v2
 
 Cabecera recomendada:
 
@@ -81,22 +98,31 @@ Reglas NC:
 - `COD_REF=1` cuando ambos montos son iguales; en otro caso `COD_REF=3`.
 - La fecha referenciada debe cumplir el rango mensual del INI.
 
-## 5. Layout generado
+## 6. Layout generado
 
 - B1 `33/39`: `E`, `D`, `G`, `T` con largos `1405`, `2075`, `123`, `70`.
 - NC `61`: `E`, `D`, `F`, `G`, `T` con largos `1405`, `2075`, `185`, `123`, `70`.
 - En NC, `FchRef` permanece en posiciones 35–42 y `CodRef` en 43.
 
-## 6. Pruebas
+## 7. Pruebas
+
+Pruebas automáticas:
 
 ```bat
 scripts\probar_codigo.cmd
-scripts\ejecutar_prueba.cmd
 ```
 
-El segundo comando procesa el CSV ficticio completo en dry-run. No llama al endpoint.
+Dry-run con el archivo real ubicado en la raíz:
 
-## 7. Emisión real limitada
+```bat
+scripts\ejecutar_prueba.cmd reporte_diario.csv
+```
+
+También puedes ejecutar `scripts\ejecutar_prueba.cmd` sin argumento. Si existe `reporte_diario.csv` en la raíz, lo usará; de lo contrario utilizará el CSV ficticio de `examples`.
+
+El dry-run no llama al endpoint. Genera `args3`, una previsualización SOAP y el CSV de control.
+
+## 8. Emisión real limitada
 
 ```bat
 scripts\ejecutar_real.cmd reporte_diario.csv
@@ -104,7 +130,7 @@ scripts\ejecutar_real.cmd reporte_diario.csv
 
 Exige escribir `EMITIR` y procesa máximo dos documentos.
 
-## 8. Emisión real completa
+## 9. Emisión real completa
 
 Después de revisar el dry-run:
 
@@ -112,12 +138,12 @@ Después de revisar el dry-run:
 .venv\Scripts\python.exe src\etl_emision_dte_onlinegeneration_real.py ^
   --input reporte_diario.csv ^
   --out salida_dte ^
-  --config config_nc_onlinegeneration.ini ^
+  --config config_dte_onlinegeneration.ini ^
   --emitir-real ^
   --procesar-todos
 ```
 
-## 9. Salidas
+## 10. Salidas
 
 - `*_args3.txt`: layout posicional.
 - `*_request.xml`: SOAP de previsualización sin credenciales visibles.
@@ -125,12 +151,12 @@ Después de revisar el dry-run:
 - `dte_control_emision_*.csv`: control OK/NOK, tipo DTE, folio, montos y regla NC.
 - `etl_dte_*.log`: bitácora.
 
-## 10. Dependencia Python
+## 11. Dependencia Python
 
 ```text
 requests>=2.31.0,<3.0.0
 ```
 
-## 11. Homologación necesaria
+## 12. Homologación necesaria
 
 Antes de emitir B1 en volumen, ejecutar casos controlados de DTE 33 y 39 en ambos motores y validar PDF, folio, montos, giro receptor, fecha y contabilización. Las NC mantienen la estructura de referencia ya utilizada, agregando únicamente la restricción mensual configurable.

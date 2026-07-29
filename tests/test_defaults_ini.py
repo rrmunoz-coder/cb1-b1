@@ -71,10 +71,19 @@ class TestDefaultsIni(unittest.TestCase):
         self.assertEqual([], usados)
 
     def test_no_aplica_defaults_financieros(self):
-        row = {"MONTO_DOC": ""}
+        row = {
+            "NOMBRE": "CLIENTE CSV",
+            "GIRO": "GIRO CSV",
+            "DIRECCION": "DIRECCION CSV",
+            "COMUNA": "COMUNA CSV",
+            "CIUDAD": "CIUDAD CSV",
+            "EMAIL": "cliente@example.com",
+            "MONTO_DOC": "",
+        }
         resultado, usados = aplicar_defaults_ini(row, self.config())
 
         self.assertEqual("", resultado["MONTO_DOC"])
+        self.assertNotIn("MONTO_DOC", usados)
         self.assertEqual([], usados)
 
 

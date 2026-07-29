@@ -7,11 +7,43 @@ import logging
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 from etl_common import __version__, cargar_config, leer_csv, setup_logging, split_rut, validar_columnas
 from etl_layout import construir_args3, construir_payload
 from etl_ws import construir_soap, emitir_ws, motor_section, normalizar_respuesta_acepta
+
+
+CAMPOS_DEFAULT_INI = {
+    "NOMBRE": "nombre",
+    "GIRO": "giro",
+    "DIRECCION": "direccion",
+    "COMUNA": "comuna",
+    "CIUDAD": "ciudad",
+    "EMAIL": "email",
+}
+
+
+def aplicar_defaults_ini(row: Dict[str, str], cfg: Any) -> Tuple[Dict[str, str], List[str]]:
+    """Completa sólo campos vacíos del CSV con valores fijos del INI.
+
+    El valor presente en el CSV siempre tiene prioridad. Esta función no aplica
+    defaults a RUT, folios, tipos de documento, fechas ni montos.
+    """
+    resultado = dict(row)
+    usados: List[str] = []
+
+    for campo_csv, clave_ini in CAMPOS_DEFAULT_INI.items():
+        valor_csv = str(resultado.get(campo_csv) or "").strip()
+        if valor_csv:
+            continue
+
+        valor_ini = cfg.get("VALORES_POR_DEFECTO", clave_ini, fallback="").strip()
+        if valor_ini:
+            resultado[campo_csv] = valor_ini
+            usados.append(campo_csv)
+
+    return resultado, usados
 
 
 def escribir_csv(path: Path, rows: List[Dict[str, Any]]) -> None:
@@ -70,7 +102,15 @@ def procesar(args: argparse.Namespace) -> Dict[str, Path]:
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     control: List[Dict[str, Any]] = []
 
-    for idx, row in enumerate(rows, start=2):
+    for idx, row_original in enumerate(rows, start=2):
+        row, campos_default_ini = aplicar_defaults_ini(row_original, cfg)
+        if campos_default_ini:
+            logging.info(
+                "Línea %s: valores del INI aplicados sólo por campos vacíos: %s",
+                idx,
+                ", ".join(campos_default_ini),
+            )
+
         payload, errores = construir_payload(
             row,
             meses_referencia_nc=meses_referencia_nc,
@@ -102,6 +142,7 @@ def procesar(args: argparse.Namespace) -> Dict[str, Path]:
             "MONTO_NETO": payload.get("MONTO_NETO", ""),
             "MONTO_IVA": payload.get("MONTO_IVA", ""),
             "COD_REF": payload.get("COD_REF", ""),
+            "CAMPOS_DEFAULT_INI": ",".join(campos_default_ini),
             "ESTADO_EMISION": "",
             "DESCRIPCION_FALLA": "",
             "CODIGO_RESPUESTA": "",

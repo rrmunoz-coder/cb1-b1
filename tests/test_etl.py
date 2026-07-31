@@ -1,5 +1,6 @@
 import importlib.util
 import csv
+import logging
 import sys
 import tempfile
 import unittest
@@ -128,6 +129,9 @@ class TestCsvVacio(unittest.TestCase):
     def ejecutar_vacio(self, contenido: str):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
+        # En Windows el FileHandler bloquea el temporal si no se cierra primero.
+        # Los cleanups se ejecutan en orden LIFO: shutdown antes de temp.cleanup.
+        self.addCleanup(logging.shutdown)
         raiz = Path(temp.name)
         entrada = raiz / "reporte_diario.csv"
         entrada.write_text(contenido, encoding="utf-8-sig")
@@ -165,8 +169,12 @@ class TestCsvVacio(unittest.TestCase):
                 "--out", str(raiz / "salida"),
                 "--config", str(config),
             ])
-            with self.assertRaisesRegex(ValueError, "CSV sin registros"):
-                etl.procesar(args)
+            try:
+                with self.assertRaisesRegex(ValueError, "CSV sin registros"):
+                    etl.procesar(args)
+            finally:
+                # Libera etl_dte_*.log antes de que TemporaryDirectory lo elimine.
+                logging.shutdown()
 
 
 if __name__ == "__main__":

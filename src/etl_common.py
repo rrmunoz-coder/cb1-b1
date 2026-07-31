@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import codecs
 import configparser
 import csv
 import logging
@@ -18,7 +19,7 @@ TIPO_DTE_NC = 61
 GLOSA_B1_DEFAULT = "Servicios de Telecomunicaciones"
 GLOSA_NC_DEFAULT = "Ajuste de Cargo Emitido"
 IVA = 0.19
-__version__ = "2.0.0"
+__version__ = "2.0.1"
 DEFAULT_ENDPOINT = ""
 SOAP_NS = "http://www.w3.org/2003/05/soap-envelope"
 WEB_NS = "http://webservices.online.webapp.paperless.cl"
@@ -76,6 +77,8 @@ args5 = 2
 tipo_foliacion_e72 = 2
 
 [REGLAS]
+# false = un CSV sin filas termina correctamente como SIN_DATOS; true = provoca error.
+csv_vacio_es_error = false
 # 0 = sólo mes actual; 1 = mes actual o mes anterior; 2 = hasta dos meses anteriores.
 meses_documento_referencia_nc = 1
 
@@ -251,6 +254,18 @@ def validar_mes_referencia_nc(
 
 
 def leer_csv(path: Path) -> List[Dict[str, str]]:
+    if not path.exists():
+        raise FileNotFoundError(f"No existe el CSV de entrada: {path}")
+
+    contenido = path.read_bytes()
+    for bom in (codecs.BOM_UTF8, codecs.BOM_UTF16_LE, codecs.BOM_UTF16_BE):
+        if contenido.startswith(bom):
+            contenido = contenido[len(bom):]
+            break
+    if not contenido.strip():
+        logging.info("CSV leído OK: %s | archivo vacío | filas=0", path)
+        return []
+
     last_error = None
     for enc in ("utf-8-sig", "utf-8", "latin-1", "cp1252"):
         try:

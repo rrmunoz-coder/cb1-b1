@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Punto de entrada del ETL mixto CB1/B1, versión 2.0.0."""
+"""Punto de entrada del ETL mixto CB1/B1, versión 2.0.1."""
 
 from pathlib import Path
 import sys

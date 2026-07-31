@@ -1,5 +1,7 @@
 import importlib.util
+import csv
 import sys
+import tempfile
 import unittest
 from datetime import datetime
 from pathlib import Path
@@ -101,6 +103,70 @@ class TestNC(unittest.TestCase):
             fecha_ejecucion=datetime(2026, 7, 28),
         )
         self.assertTrue(any("fuera del rango permitido" in error for error in errores))
+
+
+class TestCsvVacio(unittest.TestCase):
+    CABECERA = (
+        "MARCA,RUT_EMISOR,TIPO_DOC,TIPO_SUSCRIPTOR,RUT_CLIENTE,NOMBRE,GIRO,"
+        "DIRECCION,COMUNA,CIUDAD,BILL_NO,EMISION,MONTO_DOC,EMAIL,"
+        "TIPO_DOC_REF,FOLIO_REBAJADO,EMISION_BOLETA,MONTO_NCRD\n"
+    )
+
+    @staticmethod
+    def crear_config(path: Path, csv_vacio_es_error: str = "false") -> None:
+        path.write_text(
+            "[GENERAL]\nendpoint=COMPLETAR_ENDPOINT_INTERNO\n"
+            "[REGLAS]\nmeses_documento_referencia_nc=1\n"
+            f"csv_vacio_es_error={csv_vacio_es_error}\n"
+            "[DOCUMENTOS]\nglosa_b1=Servicios de Telecomunicaciones\n"
+            "glosa_nc=Ajuste de Cargo Emitido\n"
+            "[ACEPTA]\nargs0=94675000\nargs1=COMPLETAR_LOGIN\nargs2=COMPLETAR_PASSWORD_O_HASH\n"
+            "[CONDOR]\nargs0=76114143\nargs1=COMPLETAR_LOGIN\nargs2=COMPLETAR_PASSWORD_O_HASH\n",
+            encoding="utf-8",
+        )
+
+    def ejecutar_vacio(self, contenido: str):
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        raiz = Path(temp.name)
+        entrada = raiz / "reporte_diario.csv"
+        entrada.write_text(contenido, encoding="utf-8-sig")
+        config = raiz / "config_dte_onlinegeneration.ini"
+        self.crear_config(config)
+        args = etl.build_parser().parse_args([
+            "--input", str(entrada),
+            "--out", str(raiz / "salida"),
+            "--config", str(config),
+            "--procesar-todos",
+        ])
+        return etl.procesar(args)
+
+    def test_csv_solo_cabecera_termina_sin_datos(self):
+        resultado = self.ejecutar_vacio(self.CABECERA)
+        with resultado["control"].open("r", encoding="utf-8-sig", newline="") as archivo:
+            filas = list(csv.DictReader(archivo, delimiter=";"))
+        self.assertEqual(len(filas), 1)
+        self.assertEqual(filas[0]["ESTADO_EMISION"], "SIN_DATOS")
+        self.assertIn("sin registros", filas[0]["MENSAJE_RESPUESTA"])
+
+    def test_archivo_cero_bytes_termina_sin_datos(self):
+        resultado = self.ejecutar_vacio("")
+        self.assertTrue(resultado["control"].exists())
+
+    def test_csv_vacio_puede_configurarse_como_error(self):
+        with tempfile.TemporaryDirectory() as temp:
+            raiz = Path(temp)
+            entrada = raiz / "reporte_diario.csv"
+            entrada.write_text(self.CABECERA, encoding="utf-8-sig")
+            config = raiz / "config_dte_onlinegeneration.ini"
+            self.crear_config(config, "true")
+            args = etl.build_parser().parse_args([
+                "--input", str(entrada),
+                "--out", str(raiz / "salida"),
+                "--config", str(config),
+            ])
+            with self.assertRaisesRegex(ValueError, "CSV sin registros"):
+                etl.procesar(args)
 
 
 if __name__ == "__main__":

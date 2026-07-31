@@ -1,5 +1,13 @@
 # Historial de versiones
 
+## 2.0.1 — 2026-07-31
+
+- Un CSV con sólo cabecera o de cero bytes ya no detiene la ejecución por defecto.
+- Se genera un `dte_control_emision_*.csv` con `ESTADO_EMISION=SIN_DATOS`.
+- La ejecución termina con código `0` y no intenta generar ni emitir documentos.
+- Nuevo parámetro `[REGLAS] csv_vacio_es_error=false`; con `true` conserva el comportamiento de error.
+- Se agregan pruebas automáticas para archivo vacío, archivo con sólo cabecera y modo estricto.
+
 ## 2.0.0 — 2026-07-28
 
 Cambio mayor y no retrocompatible.

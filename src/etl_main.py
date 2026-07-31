@@ -37,6 +37,54 @@ def procesar(args: argparse.Namespace) -> Dict[str, Path]:
 
     input_path = Path(args.input)
     rows = leer_csv(input_path)
+    input_sha256 = hashlib.sha256(input_path.read_bytes()).hexdigest()
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    csv_vacio_es_error = cfg.getboolean("REGLAS", "csv_vacio_es_error", fallback=False)
+
+    if not rows:
+        if csv_vacio_es_error:
+            raise ValueError("CSV sin registros")
+
+        control_path = out_dir / f"dte_control_emision_{ts}.csv"
+        control_sin_datos = [{
+            "VERSION_ETL": __version__,
+            "ARCHIVO_ENTRADA": input_path.name,
+            "SHA256_ENTRADA": input_sha256,
+            "NRO_LINEA": 0,
+            "BILL_NO": "",
+            "MOTOR": "",
+            "RUT_EMISOR": "",
+            "TIPO_DTE": "",
+            "FOLIO_INTERNO": "",
+            "FOLIO_DTE": "",
+            "URL_PDF": "",
+            "TIPO_DOC_REF": "",
+            "FOLIO_REF": "",
+            "FECHA_DTE_YYYYMMDD": "",
+            "FECHA_ORIGEN_CSV_YYYYMMDD": "",
+            "FECHA_DOC_REF_YYYYMMDD": "",
+            "MESES_REFERENCIA_NC": "",
+            "MONTO_DOC": "",
+            "MONTO_NCRD": "",
+            "MONTO_TOTAL_DTE": "",
+            "MONTO_NETO": "",
+            "MONTO_IVA": "",
+            "COD_REF": "",
+            "ESTADO_EMISION": "SIN_DATOS",
+            "DESCRIPCION_FALLA": "",
+            "CODIGO_RESPUESTA": "",
+            "MENSAJE_RESPUESTA": "CSV sin registros. Ejecución finalizada sin emisión.",
+            "FECHA_HORA": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        }]
+        escribir_csv(control_path, control_sin_datos)
+        logging.warning(
+            "SIN_DATOS: archivo=%s | no se generaron ni emitieron documentos | control=%s",
+            input_path, control_path,
+        )
+        logging.info("Resumen: procesados=0 | OK=0 | NOK=0 | SIN_DATOS=1")
+        logging.info("Log: %s", log_path)
+        return {"control": control_path, "log": log_path, "config": Path(args.config)}
+
     validar_columnas(rows)
 
     if args.max_docs <= 0:
@@ -55,7 +103,6 @@ def procesar(args: argparse.Namespace) -> Dict[str, Path]:
         limite = min(total_entrada, args.max_docs)
 
     rows = rows[:limite]
-    input_sha256 = hashlib.sha256(input_path.read_bytes()).hexdigest()
     meses_referencia_nc = cfg.getint("REGLAS", "meses_documento_referencia_nc", fallback=1)
     glosa_b1 = cfg.get("DOCUMENTOS", "glosa_b1", fallback="Servicios de Telecomunicaciones")
     glosa_nc = cfg.get("DOCUMENTOS", "glosa_nc", fallback="Ajuste de Cargo Emitido")
@@ -67,7 +114,6 @@ def procesar(args: argparse.Namespace) -> Dict[str, Path]:
         __version__, input_path, total_entrada, len(rows), args.emitir_real, meses_referencia_nc,
     )
 
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     control: List[Dict[str, Any]] = []
 
     for idx, row in enumerate(rows, start=2):

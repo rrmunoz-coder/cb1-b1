@@ -19,6 +19,7 @@ Actúa como desarrollador senior Python especializado en ETL financiero, DTE chi
 9. Validar la fecha referenciada por mes calendario con `[REGLAS] meses_documento_referencia_nc`.
 10. Con valor `1`, aceptar sólo el mes de ejecución y el mes anterior; rechazar meses futuros.
 11. Enrutar `94675000-K` a ACEPTA y `76114143-0` a Cóndor/Paperless.
+12. Tratar CSV vacío o con sólo cabecera como `SIN_DATOS` y salida exitosa por defecto, parametrizable con `[REGLAS] csv_vacio_es_error`.
 
 ## Layouts
 
